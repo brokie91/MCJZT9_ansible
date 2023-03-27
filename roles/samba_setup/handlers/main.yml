@@ -1,0 +1,12 @@
+---
+# handlers file for samba_setup
+- name: restart samba
+  service:
+    name: smb
+    state: restarted
+
+- name: SELinux file context for Samba share
+  command: 
+    cmd: restorecon -Rv '{{ samba_share_path }}'
+  become: true
+  changed_when: false

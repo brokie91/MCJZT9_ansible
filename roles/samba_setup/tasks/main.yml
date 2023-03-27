@@ -1,0 +1,35 @@
+---
+# tasks file for samba_setup
+- name: Install Samba server
+  dnf:
+    name: samba
+    state: present
+
+- name: Ensuring samba shared directory exists
+  file:
+    path: "{{ samba_share_path }}"
+    setype: samba_share_t
+    state: directory
+    mode: '0755'
+    owner: nobody
+    group: nobody
+  become: true
+
+- name: Placing test file into shared directory
+  file:
+    path: "{{ samba_share_path }}/hello"
+    state: touch
+    setype: samba_share_t
+  notify: SELinux file context for Samba share
+
+- name: Starting Samba service
+  service:
+    name: smb
+    enabled: true
+    state: started
+
+- name: Create Samba configuration file
+  template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+  notify: restart samba

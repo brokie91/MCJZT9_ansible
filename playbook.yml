@@ -1,0 +1,83 @@
+---
+- name: Configure Samba server and firewall
+  hosts: filesharing 
+  become: true
+  gather_facts: true
+
+  vars:
+    allowed_services:
+      - ssh
+      - samba
+    allowed_ports:
+      - 4312
+    firewall_zone_name: testzone4
+    host_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+    host_name: "{{ ansible_facts['hostname'] }}"
+
+  roles:
+    - samba_setup
+
+  tasks:
+    - name: "Create a new firewall zone named {{ firewall_zone_name }}"
+      firewalld:
+        zone: "{{ firewall_zone_name }}"
+        state: present
+        permanent: true
+
+    - name: "Set default firewall policy on zone {{ firewall_zone_name }} to reject"
+      firewalld:
+        zone: "{{ firewall_zone_name }}"
+        rich_rule: 'rule family="ipv4" source address="0.0.0.0" reject'
+        permanent: true
+        state: enabled
+
+    - name: Add allowed service to firewall
+      firewalld:
+        zone: "{{ firewall_zone_name }}"
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+      loop: "{{ allowed_services }}"
+
+    - name: Add allowed ports to firewall
+      firewalld:
+        zone: "{{ firewall_zone_name }}"
+        port: "{{ item }}/tcp"
+        permanent: true
+        state: enabled
+      loop: "{{ allowed_ports }}"
+
+    - name: Reloading firewalld service
+      systemd:
+        name: firewalld
+        state: restarted
+
+    - name: "Ensuring {{ firewall_zone_name }} zone is selected"
+      command:
+        cmd: firewall-cmd --set-default-zone={{ firewall_zone_name }}
+
+    - name: "Ensuring /data/{{ host_name | trim}} directory exists"
+      file:
+        path: /data/{{ host_name | trim}}
+        state: directory
+
+    - name: Ensuring mount.cifs package is installed
+      ansible.builtin.dnf:
+        name: cifs-utils
+        state: present
+
+    - name: Mount student home directory to /data
+      mount:
+        path: /data/{{ host_name | trim }}
+        src: //{{ host_ip | trim }}/share
+        fstype: cifs
+        state: mounted
+        opts: "guest,uid={{ ansible_user_id }},gid={{ ansible_user_id }},iocharset=utf8"
+      become: true
+
+    - name: Add entry to /etc/fstab for student home directory mount
+      lineinfile:
+        path: /etc/fstab
+        line: "//{{ host_ip | trim }}/share /data/{{ host_name | trim }} cifs guest,uid=0,iocharset=utf8 0 0"
+        state: present
+      become: true
