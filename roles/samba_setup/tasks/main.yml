@@ -10,17 +10,13 @@
     path: "{{ samba_share_path }}"
     setype: samba_share_t
     state: directory
-    mode: '0755'
-    owner: nobody
-    group: nobody
   become: true
 
-- name: Placing test file into shared directory
-  file:
-    path: "{{ samba_share_path }}/hello"
-    state: touch
-    setype: samba_share_t
-  notify: SELinux file context for Samba share
+- name: Create Samba configuration file
+  template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+  notify: restart samba
 
 - name: Starting Samba service
   service:
@@ -28,8 +24,20 @@
     enabled: true
     state: started
 
-- name: Create Samba configuration file
-  template:
-    src: smb.conf.j2
-    dest: /etc/samba/smb.conf
-  notify: restart samba
+- name: Placing test file into shared directory
+  file:
+    path: "{{ samba_share_path }}/hello"
+    state: touch
+    setype: samba_share_t
+
+- name: install semanage
+  package:
+    name: policycoreutils-python-utils
+    state: present
+
+- name: Set new fcontext for file
+  sefcontext:
+    target: "{{ samba_share_path }}(/.*)?"
+    setype: "samba_share_t"
+    state: present
+  notify: SELinux file context for Samba share

@@ -6,7 +6,4 @@
     state: restarted
 
 - name: SELinux file context for Samba share
-  command: 
-    cmd: restorecon -Rv '{{ samba_share_path }}'
-  become: true
-  changed_when: false
+  raw: restorecon -R {{ samba_share_path }}

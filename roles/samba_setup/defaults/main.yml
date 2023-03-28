@@ -2,4 +2,4 @@
 # defaults file for samba_setup
 samba_workgroup: WORKGROUP
 samba_security: user
-samba_share_path: /srv/samba/testshare2
+samba_share_path: /srv/samba/testshareFinal

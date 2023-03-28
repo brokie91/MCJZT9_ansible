@@ -13,6 +13,8 @@
     firewall_zone_name: testzone4
     host_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
     host_name: "{{ ansible_facts['hostname'] }}"
+    samba_username: guest
+    samba_password: 
 
   roles:
     - samba_setup
@@ -56,28 +58,30 @@
       command:
         cmd: firewall-cmd --set-default-zone={{ firewall_zone_name }}
 
-    - name: "Ensuring /data/{{ host_name | trim}} directory exists"
+- name: Mounting share on control node
+  hosts: localhost
+  become: no
+  vars:
+    share_directory_name: shareFinal
+    share_ip: 10.0.2.10
+  tasks:
+    - name: "Ensuring /data/{{ share_directory_name }} directory exists"
+      become: true
       file:
-        path: /data/{{ host_name | trim}}
+        path: /data/{{ share_directory_name }}
         state: directory
 
-    - name: Ensuring mount.cifs package is installed
+    - name: Ensuring mount.cifs package is installed on control node
       ansible.builtin.dnf:
         name: cifs-utils
         state: present
+      become: true
 
-    - name: Mount student home directory to /data
+    - name: Mount samba share on control node
+      become: no
       mount:
-        path: /data/{{ host_name | trim }}
-        src: //{{ host_ip | trim }}/share
+        src: //{{ share_ip }}/share
+        path: /data/{{ share_directory_name }}
         fstype: cifs
+        opts: "guest,noserverino"
         state: mounted
-        opts: "guest,uid={{ ansible_user_id }},gid={{ ansible_user_id }},iocharset=utf8"
-      become: true
-
-    - name: Add entry to /etc/fstab for student home directory mount
-      lineinfile:
-        path: /etc/fstab
-        line: "//{{ host_ip | trim }}/share /data/{{ host_name | trim }} cifs guest,uid=0,iocharset=utf8 0 0"
-        state: present
-      become: true
